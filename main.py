@@ -7,7 +7,7 @@ from dash import Dash, html, dash_table, dcc, callback, Input, Output, Patch
 import pandas as pd
 import plotly.express as px
 
-
+# Importing and defining styles
 dbc_css = "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates/dbc.min.css"
 load_figure_template(["minty", "morph", "slate"])
 temp = "minty"
@@ -43,6 +43,7 @@ for d in columnDefinition:
             }
         })
 
+# defining table
 table = dag.AgGrid(
     id="data-selection-table",
     columnDefs=columnDefinition,
@@ -66,6 +67,7 @@ table = dag.AgGrid(
     className="ag-theme-balham",
 )
 
+# defining preview graph
 graph = dcc.Graph(
     id='data-graph',
     figure=px.scatter(
@@ -78,34 +80,95 @@ graph = dcc.Graph(
     ),
 )
 
-default_x_param=df.columns[4]
-print(df.columns[4])
-default_y_param=df.columns[3]
-print(df.columns[3])
-default_z_param=df.columns[6]
-print(df.columns[6])
+parameter_list = ["None"] + [i for i in df.select_dtypes(include='number')]
+
+default_x_param = parameter_list[3]
+print(parameter_list[3])
+default_y_param = parameter_list[2]
+print(parameter_list[2])
+default_z_param = parameter_list[0]
+print(parameter_list[0])
 
 # Initialize the app
 app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY, dbc_css])
 
-# App layout
-app.layout = dbc.Container([
+# the style arguments for the sidebar. We use position:fixed and a fixed width
+SIDEBAR_STYLE = {
+    "position": "fixed",
+    "top": 0,
+    "left": 0,
+    "bottom": 0,
+    "width": "16rem",
+    "padding": "2rem 1rem",
+    "background-color": "#f8f9fa",
+}
 
-    dbc.Label("dcc.Dropdown with Bootstrap theme"),
-    dcc.Dropdown([i for i in df.select_dtypes(include='number')], id="dropdown-preview-graph-x-axis", value=default_x_param,
+# the styles for the main content position it to the right of the sidebar and
+# add some padding.
+CONTENT_STYLE = {
+    "margin-left": "18rem",
+    "margin-right": "2rem",
+    "padding": "2rem 1rem",
+}
+
+sidebar = html.Div(
+    [
+        html.H2("MOSFET APP", className="display-4"),
+        html.Hr(),
+        html.P(
+            "A simple sidebar layout with navigation links", className="lead"
+        ),
+        dbc.Nav(
+            [
+                dbc.Progress(),
+                dbc.NavLink("Home", href="/", active="exact"),
+                dbc.NavLink("Setup", href="/setup", active="exact"),
+                dbc.NavLink("Result", href="/result", active="exact"),
+            ],
+            vertical=True,
+            pills=True,
+        ),
+    ],
+    style=SIDEBAR_STYLE,
+)
+
+content_home = dbc.Container([
+    dbc.Label("Home"),
+],
+    className="dbc",
+    id="content-home",
+    style={'display': 'inline'}
+)
+
+content_setup = dbc.Container([
+    dbc.Label("Preview graph axis parameter selection"),
+    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-x-axis", value=default_x_param,
                  placeholder="X-axis"),
-    dcc.Dropdown([i for i in df.select_dtypes(include='number')], id="dropdown-preview-graph-y-axis", value=default_y_param,
+    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-y-axis", value=default_y_param,
                  placeholder="Y-axis"),
-    dcc.Dropdown([i for i in df.select_dtypes(include='number')], id="dropdown-preview-graph-z-axis", value=default_z_param,
+    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-z-axis", value=default_z_param,
                  placeholder="Size-axis"),
-
     html.Br(),
     graph,
     table,
     html.Div(id="selections-checkbox-output"),
 ],
     className="dbc",
+    id="content-setup",
+    style={'display': 'inline'}
 )
+
+content_result = dbc.Container([
+    dbc.Label("Result"),
+],
+    className="dbc",
+    id="content-result",
+    style={'display': 'inline'}
+)
+
+content = html.Div(children=[content_home, content_setup, content_result], id="page-content", style=CONTENT_STYLE)
+
+app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
 
 @callback(
@@ -116,13 +179,17 @@ app.layout = dbc.Container([
     Input('dropdown-preview-graph-z-axis', 'value'))
 def update_graph(selected, value_x, value_y, value_z):
     patched_fig = Patch()
+    values_xyz = [value_x, value_y, value_z]
+    for i in range(len(values_xyz)):
+        if values_xyz[i] == "None":
+            values_xyz[i] = None
     if selected:
         dff = pd.DataFrame(selected)
         fig = px.scatter(
             dff,
-            x=value_x,
-            y=value_y,
-            size=value_z,
+            x=values_xyz[0],
+            y=values_xyz[1],
+            size=values_xyz[2],
             color='mpn',
             template=temp,
         )
@@ -135,10 +202,24 @@ def update_graph(selected, value_x, value_y, value_z):
             size='c_oss',
             color='mpn',
             template=temp,
+            labels=["x", "y"]
         )
         return fig
 
 
+@app.callback(Output("content-home", "style"), [Input("url", "pathname")])
+def render_page_home(pathname):
+    return {'display': 'inline'} if (pathname == "/") else {'display': 'None'}
+
+
+@app.callback(Output("content-setup", "style"), [Input("url", "pathname")])
+def render_page_setup(pathname):
+    return {'display': 'inline'} if (pathname == "/setup") else {'display': 'None'}
+
+
+@app.callback(Output("content-result", "style"), [Input("url", "pathname")])
+def render_page_result(pathname):
+    return {'display': 'inline'} if (pathname == "/result") else {'display': 'None'}
 
 
 # Run the app
