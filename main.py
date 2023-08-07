@@ -7,6 +7,12 @@ from dash import Dash, html, dash_table, dcc, callback, Input, Output, Patch
 import pandas as pd
 import plotly.express as px
 
+from bench import workbench, transistor
+
+
+scatter_width = None
+scatter_height = 600
+
 # Importing and defining styles
 dbc_css = "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates/dbc.min.css"
 load_figure_template(["minty", "morph", "slate"])
@@ -14,6 +20,19 @@ temp = "minty"
 
 # Importing data
 df = pd.read_csv('data.csv')
+
+
+q1 = transistor(df,4)
+wb1 = workbench(q1,100,2,0.5,100e3)
+
+wb1.set_sweep_range(0,100)
+
+print(wb1.frequency_sweep())
+
+
+print(q1.mpn)
+print(q1.r_ds_on)
+
 
 # Setting header names and options
 columnDefinition = [{"field": i} for i in df.columns]
@@ -76,18 +95,17 @@ graph = dcc.Graph(
         y='r_ds_on',
         size='c_oss',
         color='mpn',
-        template=temp
+        template=temp,
+        width=scatter_width,
+        height=scatter_height,
     ),
+
 )
 
 parameter_list = ["None"] + [i for i in df.select_dtypes(include='number')]
-
-default_x_param = parameter_list[3]
-print(parameter_list[3])
-default_y_param = parameter_list[2]
-print(parameter_list[2])
+default_x_param = parameter_list[2]
+default_y_param = parameter_list[3]
 default_z_param = parameter_list[0]
-print(parameter_list[0])
 
 # Initialize the app
 app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY, dbc_css])
@@ -106,6 +124,7 @@ SIDEBAR_STYLE = {
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
 CONTENT_STYLE = {
+    "max-width":"1800px",
     "margin-left": "18rem",
     "margin-right": "2rem",
     "padding": "2rem 1rem",
@@ -116,7 +135,7 @@ sidebar = html.Div(
         html.H2("MOSFET APP", className="display-4"),
         html.Hr(),
         html.P(
-            "A simple sidebar layout with navigation links", className="lead"
+            "N-MOS power loss estimation tool", className="lead"
         ),
         dbc.Nav(
             [
@@ -141,15 +160,33 @@ content_home = dbc.Container([
 )
 
 content_setup = dbc.Container([
-    dbc.Label("Preview graph axis parameter selection"),
-    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-x-axis", value=default_x_param,
-                 placeholder="X-axis"),
-    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-y-axis", value=default_y_param,
-                 placeholder="Y-axis"),
-    dcc.Dropdown(parameter_list, id="dropdown-preview-graph-z-axis", value=default_z_param,
-                 placeholder="Size-axis"),
+    dbc.Row([graph]),
+    dbc.Row([
+        dbc.Col([
+            dbc.Label("X-Axis:"),
+            dcc.Dropdown(parameter_list, id="dropdown-preview-graph-x-axis", value=default_x_param,
+                         placeholder="X-axis"),
+        ],
+            width=1
+        ),
+        dbc.Col([
+            dbc.Label("Y-Axis:"),
+            dcc.Dropdown(parameter_list, id="dropdown-preview-graph-y-axis", value=default_y_param,
+                         placeholder="Y-axis"),
+        ],
+            width=1
+        ),
+        dbc.Col([
+            dbc.Label("Size:"),
+            dcc.Dropdown(parameter_list, id="dropdown-preview-graph-z-axis", value=default_z_param,
+                         placeholder="Size-axis"),
+        ],
+            width=1
+        ),
+    ],
+        justify="center"
+    ),
     html.Br(),
-    graph,
     table,
     html.Div(id="selections-checkbox-output"),
 ],
@@ -178,7 +215,6 @@ app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
     Input('dropdown-preview-graph-y-axis', 'value'),
     Input('dropdown-preview-graph-z-axis', 'value'))
 def update_graph(selected, value_x, value_y, value_z):
-    patched_fig = Patch()
     values_xyz = [value_x, value_y, value_z]
     for i in range(len(values_xyz)):
         if values_xyz[i] == "None":
@@ -192,17 +228,20 @@ def update_graph(selected, value_x, value_y, value_z):
             size=values_xyz[2],
             color='mpn',
             template=temp,
+            width=scatter_width,
+            height=scatter_height
         )
         return fig
     else:
         fig = px.scatter(
             df,
-            x='q_g',
-            y='r_ds_on',
-            size='c_oss',
+            x=default_x_param,
+            y=default_y_param,
+            size=default_z_param,
             color='mpn',
             template=temp,
-            labels=["x", "y"]
+            width=scatter_width,
+            height=scatter_height
         )
         return fig
 
