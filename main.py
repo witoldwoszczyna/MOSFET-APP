@@ -9,7 +9,6 @@ import plotly.express as px
 
 from bench import workbench, transistor
 
-
 scatter_width = None
 scatter_height = 600
 
@@ -21,18 +20,16 @@ temp = "minty"
 # Importing data
 df = pd.read_csv('data.csv')
 
+q1 = transistor(df, 4)
+wb1 = workbench(100, 2, 0.5, 100e3)
+wb1.solder_transistor(q1)
+lst = [10**i for i in range(7)]
+wb1.set_sweep_list(lst)
 
-q1 = transistor(df,4)
-wb1 = workbench(q1,100,2,0.5,100e3)
-
-wb1.set_sweep_range(0,100)
-
-print(wb1.frequency_sweep())
-
-
+sweep1 = wb1.frequency_sweep()
+print(sweep1)
 print(q1.mpn)
 print(q1.r_ds_on)
-
 
 # Setting header names and options
 columnDefinition = [{"field": i} for i in df.columns]
@@ -124,7 +121,7 @@ SIDEBAR_STYLE = {
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
 CONTENT_STYLE = {
-    "max-width":"1800px",
+    "max-width": "1800px",
     "margin-left": "18rem",
     "margin-right": "2rem",
     "padding": "2rem 1rem",
@@ -197,6 +194,33 @@ content_setup = dbc.Container([
 
 content_result = dbc.Container([
     dbc.Label("Result"),
+    dbc.Row([
+        dbc.Col([
+            dbc.Label("Row1 Col1"),
+            dcc.Graph(id="result_graph_1_1",
+                      figure=px.line(sweep1, x="frequency", y = sweep1.columns)
+                      )
+        ]),
+        dbc.Col([
+            dbc.Label("Row1 Col2"),
+        ]),
+    ]),
+    dbc.Row([
+        dbc.Col([
+            dbc.Label("Row2 Col1"),
+        ]),
+        dbc.Col([
+            dbc.Label("Row2 Col2"),
+        ]),
+    ]),
+    dbc.Row([
+        dbc.Col([
+            dbc.Label("Row3 Col1"),
+        ]),
+        dbc.Col([
+            dbc.Label("Row3 Col2"),
+        ]),
+    ]),
 ],
     className="dbc",
     id="content-result",

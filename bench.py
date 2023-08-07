@@ -18,7 +18,7 @@ class transistor(object):
 
 
 class workbench(object):
-    def __init__(self, transistor, voltage, current, duty, frequency):
+    def __init__(self, voltage, current, duty, frequency, transistor=None, ):
         self.I = current
         self.V = voltage
         self.D = duty
@@ -30,13 +30,24 @@ class workbench(object):
 
     sweep_start = None
     sweep_stop = None
+    sweep_lst = None
+
+    def solder_transistor(self, transistor):
+        self.Q = transistor
 
     def set_sweep_range(self, start, stop):
         self.sweep_start = start
         self.sweep_stop = stop
+        if start > stop:
+            self.sweep_start = stop
+            self.sweep_stop = start
+        self.sweep_lst = [int(i) for i in range(self.sweep_start, self.sweep_stop)]
+
+    def set_sweep_list(self, lst):
+        self.sweep_lst = lst
 
     def frequency_sweep(self):
-        if self.sweep_start or self.sweep_stop is None:
+        if self.sweep_start or self.sweep_stop or self.sweep_lst is None:
             print("Set frequency sweep range first")
         else:
             methods = [
@@ -47,34 +58,29 @@ class workbench(object):
                 self.loss_gate_charge,
                 self.loss_reverse_recovery
             ]
-            lst = [[method(f=frequency) for method in methods] for frequency in
-                   range(self.sweep_start, self.sweep_stop)]
-            return pd.DataFrame(lst,columns=["frequency","conduction","switching","output charge","gate charge","reverse recovery"])
+            lst = [[method(f=frequency) for method in methods] for frequency in self.sweep_lst]
+            return pd.DataFrame(lst, columns=["frequency", "conduction", "switching", "output charge", "gate charge",
+                                              "reverse recovery"])
 
     def loss_conduction(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return local_I ** 2 * self.Q.r_ds_on * local_D
 
-
     def loss_switching(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return 0.5 * local_V * local_I * (self.Q.tr + self.Q.tf) * local_f
-
 
     def loss_reverse_recovery(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return local_V * self.Q.q_rr * local_f
 
-
     def loss_output_charge(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return 0.5 * self.Q.c_oss * math.sqrt(self.Q.v_c_oss / local_V) * local_V ** 2 * local_f
 
-
     def loss_gate_charge(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return self.Q.q_g * local_V * local_f
-
 
     def return_value(self, I=None, V=None, D=None, f=None):
         if I is not None:
@@ -86,7 +92,6 @@ class workbench(object):
         if f is not None:
             return f
         return 0
-
 
     def overwrite_local(self, I, V, D, f):
         if I is None:
