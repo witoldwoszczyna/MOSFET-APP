@@ -6,6 +6,7 @@ from dash_bootstrap_templates import load_figure_template
 from dash import Dash, html, dash_table, dcc, callback, Input, Output, Patch
 import pandas as pd
 import plotly.express as px
+from plotly import graph_objs as go
 
 from bench import workbench, transistor
 
@@ -20,16 +21,52 @@ temp = "minty"
 # Importing data
 df = pd.read_csv('data.csv')
 
-q1 = transistor(df, 4)
-wb1 = workbench(100, 2, 0.5, 100e3)
-wb1.solder_transistor(q1)
-lst = [10**i for i in range(7)]
-wb1.set_sweep_list(lst)
+# ! DEBUG ####################################
 
-sweep1 = wb1.frequency_sweep()
-print(sweep1)
-print(q1.mpn)
-print(q1.r_ds_on)
+q1 = transistor(df, 4)
+q2 = transistor(df, 5)
+wb1 = workbench(12, 2, 0.23, 200e3)
+wb1.solder_transistor(q1)
+
+lst = [3.14 ** i for i in range(12)]
+wb1.set_sweep_list(lst)
+frequency_sweep = []
+for index, row in df.iterrows():
+    wb1.solder_transistor(transistor(df, index))
+    frequency_sweep.append(wb1.frequency_sweep())
+
+lst = [i for i in range(20)]
+wb1.set_sweep_list(lst)
+current_sweep = []
+for index, row in df.iterrows():
+    wb1.solder_transistor(transistor(df, index))
+    current_sweep.append(wb1.current_sweep())
+
+duty_sweep = []
+for index, row in df.iterrows():
+    wb1.solder_transistor(transistor(df, index))
+    duty_sweep.append(wb1.duty_sweep())
+
+fig_frequency_sweep = go.Figure()
+for dfs in frequency_sweep:
+    fig_frequency_sweep = fig_frequency_sweep.add_trace(go.Scatter(x=dfs["frequency"],
+                                                                   y=dfs["total"],
+                                                                   name=dfs.attrs['part']))
+
+fig_current_sweep = go.Figure()
+for dfs in current_sweep:
+    fig_current_sweep = fig_current_sweep.add_trace(go.Scatter(x=dfs["current"],
+                                                               y=dfs["total"],
+                                                               name=dfs.attrs['part']))
+
+fig_duty_sweep = go.Figure()
+for dfs in duty_sweep:
+    fig_duty_sweep = fig_duty_sweep.add_trace(go.Scatter(x=dfs["duty"],
+                                                         y=dfs["total"],
+                                                         name=dfs.attrs['part']))
+
+# ! DEBUG END ####################################
+
 
 # Setting header names and options
 columnDefinition = [{"field": i} for i in df.columns]
@@ -193,22 +230,29 @@ content_setup = dbc.Container([
 )
 
 content_result = dbc.Container([
-    dbc.Label("Result"),
+    dbc.Label("Results"),
     dbc.Row([
         dbc.Col([
-            dbc.Label("Row1 Col1"),
+            dbc.Label("Frequency sweep"),
+
             dcc.Graph(id="result_graph_1_1",
-                      figure=px.line(sweep1, x="frequency", y = sweep1.columns)
+                      figure=fig_frequency_sweep
                       )
-        ]),
+        ], width=6),
         dbc.Col([
-            dbc.Label("Row1 Col2"),
-        ]),
+            dbc.Label("Current sweep"),
+            dcc.Graph(id="result_graph_1_2",
+                      figure=fig_current_sweep
+                      )
+        ], width=6),
     ]),
     dbc.Row([
         dbc.Col([
-            dbc.Label("Row2 Col1"),
-        ]),
+            dbc.Label("Duty sweep"),
+            dcc.Graph(id="result_graph_2_1",
+                      figure=fig_duty_sweep
+                      )
+        ], width=6),
         dbc.Col([
             dbc.Label("Row2 Col2"),
         ]),

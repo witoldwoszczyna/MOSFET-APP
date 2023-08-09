@@ -34,6 +34,7 @@ class workbench(object):
 
     def solder_transistor(self, transistor):
         self.Q = transistor
+        return transistor.mpn
 
     def set_sweep_range(self, start, stop):
         self.sweep_start = start
@@ -56,11 +57,89 @@ class workbench(object):
                 self.loss_switching,
                 self.loss_output_charge,
                 self.loss_gate_charge,
-                self.loss_reverse_recovery
+                self.loss_reverse_recovery,
+                self.loss_total
             ]
             lst = [[method(f=frequency) for method in methods] for frequency in self.sweep_lst]
-            return pd.DataFrame(lst, columns=["frequency", "conduction", "switching", "output charge", "gate charge",
-                                              "reverse recovery"])
+            df = pd.DataFrame(lst, columns=[
+                "frequency",
+                "conduction",
+                "switching",
+                "output charge",
+                "gate charge",
+                "reverse recovery",
+                "total"
+            ])
+            df.attrs = {
+                "part": self.Q.mpn,
+                "current": self.I,
+                "voltage": self.V,
+                "duty": self.D,
+                "frequency": None
+            }
+            return df
+
+    def current_sweep(self):
+        if self.sweep_start or self.sweep_stop or self.sweep_lst is None:
+            print("Set current sweep range first")
+        else:
+            methods = [
+                self.return_value,
+                self.loss_conduction,
+                self.loss_switching,
+                self.loss_output_charge,
+                self.loss_gate_charge,
+                self.loss_reverse_recovery,
+                self.loss_total
+            ]
+            lst = [[method(I=current) for method in methods] for current in self.sweep_lst]
+            df = pd.DataFrame(lst, columns=[
+                "current",
+                "conduction",
+                "switching",
+                "output charge",
+                "gate charge",
+                "reverse recovery",
+                "total"
+            ])
+            df.attrs = {
+                "part": self.Q.mpn,
+                "current": None,
+                "voltage": self.V,
+                "duty": self.D,
+                "frequency": self.f
+            }
+            return df
+
+    def duty_sweep(self):
+        self.sweep_lst = [i*0.01 for i in range(100)]
+        methods = [
+            self.return_value,
+            self.loss_conduction,
+            self.loss_switching,
+            self.loss_output_charge,
+            self.loss_gate_charge,
+            self.loss_reverse_recovery,
+            self.loss_total
+        ]
+        lst = [[method(D=duty) for method in methods] for duty in self.sweep_lst]
+        df = pd.DataFrame(lst, columns=[
+            "duty",
+            "conduction",
+            "switching",
+            "output charge",
+            "gate charge",
+            "reverse recovery",
+            "total"
+        ])
+        df.attrs = {
+            "part": self.Q.mpn,
+            "current": self.I,
+            "voltage": self.V,
+            "duty": None,
+            "frequency": self.f
+        }
+        return df
 
     def loss_conduction(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
@@ -81,6 +160,15 @@ class workbench(object):
     def loss_gate_charge(self, I=None, V=None, D=None, f=None):
         [local_I, local_V, local_D, local_f] = self.overwrite_local(I, V, D, f)
         return self.Q.q_g * local_V * local_f
+
+    def loss_total(self, I=None, V=None, D=None, f=None):
+        return (
+                self.loss_conduction(I, V, D, f) +
+                self.loss_switching(I, V, D, f) +
+                self.loss_gate_charge(I, V, D, f) +
+                self.loss_output_charge(I, V, D, f) +
+                self.loss_reverse_recovery(I, V, D, f)
+        )
 
     def return_value(self, I=None, V=None, D=None, f=None):
         if I is not None:
@@ -103,9 +191,9 @@ class workbench(object):
         else:
             local_V = V
         if D is None:
-            local_D = self.I
+            local_D = self.D
         else:
-            local_D = I
+            local_D = D
         if f is None:
             local_f = self.f
         else:
